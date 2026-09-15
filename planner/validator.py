@@ -13,6 +13,7 @@ argument to declare and evidence its origin turns that into a string comparison.
 from __future__ import annotations
 
 import re
+from decimal import Decimal
 from typing import Any
 
 from pydantic import ValidationError as PydanticValidationError
@@ -35,7 +36,27 @@ from .types import (
 )
 
 STEP_REF = re.compile(r"^\{\{step_(\d+)\.([A-Za-z_][A-Za-z0-9_]*)\}\}$")
-NUMBER = re.compile(r"\d[\d,]*(?:\.\d+)?")
+NUMBER = re.compile(
+    r"(?<![\w.,+-])[+-]?(?:\d{1,3}(?:,\d{3})+|\d+)(?:\.\d+)?(?![\w.,])"
+)
+
+
+def evidence_values(evidence: str, *, monetary: bool) -> set[int]:
+    """Normalize evidence at the validation boundary, without float rounding.
+
+    Transfer literals use major units unless explicitly followed by cents/sen.
+    Other integer parameters (days, calculator operands) are unscaled scalars.
+    Fractional minor units and malformed comma grouping never produce a value.
+    """
+    values: set[int] = set()
+    for match in NUMBER.finditer(evidence):
+        value = Decimal(match.group().replace(",", ""))
+        minor = re.match(r"\s*(?:cents?|sen)\b", evidence[match.end():])
+        if monetary and not minor:
+            value *= 100
+        if value == value.to_integral_value():
+            values.add(int(value))
+    return values
 
 
 # --------------------------------------------------------------------------- #
@@ -540,15 +561,9 @@ def _check_user_literal(step: Step, name: str, arg: Any, haystack: str) -> list[
                            f"ground the value {arg.v!r}",
                 )
             ]
-        # Accept the number as written or scaled into minor units.
-        candidates: set[int] = set()
-        for raw in found:
-            try:
-                as_float = float(raw.replace(",", ""))
-            except ValueError:  # pragma: no cover - regex guarantees parseable
-                continue
-            candidates.add(int(as_float))
-            candidates.add(int(round(as_float * 100)))
+        candidates = evidence_values(
+            needle, monetary=(step.tool == "save_my_money_to_bank" and name == "amount")
+        )
         if arg.v not in candidates:
             return [
                 ValidationError(

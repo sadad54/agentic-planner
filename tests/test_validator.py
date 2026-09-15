@@ -166,15 +166,29 @@ def test_evidence_number_must_match_the_value():
     assert ErrorCode.EVIDENCE_VALUE_MISMATCH.value in codes(result)
 
 
-def test_minor_units_are_accepted_either_way():
-    for value in (500, 50000):
-        plan = _valid_transfer_plan()
-        plan["plan"][0]["args"]["amount"] = {
-            "v": value,
-            "src": "user_literal",
-            "ev": "Move 500",
-        }
-        assert validate(plan, MSG_TRANSFER).ok
+@pytest.mark.parametrize("message,value,expected", [
+    ("Move 500", 50000, True),
+    ("Move 500", 500, False),
+    ("Move 500.25 ringgit", 50025, True),
+    ("Move 1,250.05", 125005, True),
+    ("Move 50 sen", 50, True),
+    ("Move 50 cents", 5000, False),
+    ("Move 0.001", 0, False),
+    ("Move 1,25", 12500, False),
+    ("Move -500", 50000, False),
+])
+def test_transfer_literals_have_one_unit_conversion(message, value, expected):
+    plan = _valid_transfer_plan()
+    plan["plan"][0]["args"]["amount"] = {
+        "v": value, "src": "user_literal", "ev": message,
+    }
+    assert validate(plan, message).ok is expected
+
+
+def test_non_monetary_integer_is_not_scaled():
+    from planner.validator import evidence_values
+    assert evidence_values("past 15 days", monetary=False) == {15}
+    assert evidence_values("past 1.5 days", monetary=False) == set()
 
 
 def test_user_literal_requires_evidence():
