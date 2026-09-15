@@ -35,7 +35,7 @@ These five tools exist. Nothing else exists. The signatures are exact.
    Transfers amount into the user's bank account.
    THIS IS A WRITE. IT MOVES REAL MONEY AND CANNOT BE UNDONE.
 
-All monetary values are integers in minor currency units (cents/sen). Never emit decimals.
+All transfer amounts are integer minor currency units (cents/sen). A user literal without a unit, or with ringgit/dollars, is in major units: 500 becomes 50000; 500.25 becomes 50025. Explicit cents/sen stay unscaled. Never round fractional minor units. Non-monetary integer arguments are unscaled. Calculator references preserve the units of their inputs; mixed-unit arithmetic is outside this prototype.
 
 # INPUT
 

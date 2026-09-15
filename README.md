@@ -97,7 +97,7 @@ planner/
   tools.py         seeded mock tools
   orchestrator.py  topological execution, fold expansion, confirmation gate
 scripts/demo.py    four end-to-end scenarios
-tests/             74 tests, no network, no API key
+tests/             84 tests, no network, no API key
 ```
 
 ## Running it
@@ -119,8 +119,8 @@ cannot be a static graph, because the branch depends on a value the planner neve
 sees. `needs_replan` is a pressure valve, not a solution.
 
 **The provenance wrapper is verbose.** Every argument becomes an object rather
-than a scalar, which costs output tokens on every request. It buys the only
-mechanical defence against invented values, but the cost is real and paid
+than a scalar, which costs output tokens on every request. It provides a
+mechanical check against unsupported literals, but the cost is real and paid
 constantly.
 
 **`calculator.operation` is exempted from the default check.** The operation is
@@ -134,3 +134,17 @@ picked by intuition.
 
 **Out of scope:** authentication, multi-user isolation, rate limiting, and
 recovery when a tool fails partway through a plan that has already moved money.
+
+## Amount contract and verification
+
+Transfer `amount` values are integer minor units. Unqualified monetary evidence
+is interpreted in major units: `500` maps to `50000`, `500.25` to `50025`, and
+`1,250.05` to `125005`. Explicit `50 cents` or `50 sen` maps to `50`. Fractional
+minor units and malformed comma grouping are rejected. Non-monetary integers
+retain their scalar value; they are never multiplied by 100.
+
+The offline suite passes 84 tests, including unit mismatches and decimal evidence.
+CI runs these tests and the four deterministic demo scenarios. No live LLM or
+banking service is integrated. Substring provenance is not proof of intent: it
+does not resolve negation, ambiguous currency, or dimensional consistency of
+calculator/step-reference chains. Confirmation remains necessary before writes.
